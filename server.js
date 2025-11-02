@@ -120,57 +120,62 @@ app.all('*', (req, res, next) => {
 // Error handling middleware (must be last)
 app.use(errorHandler);
 
-// Graceful shutdown handling
-const gracefulShutdown = (signal) => {
-  console.log(`\n${signal} received. Starting graceful shutdown...`);
-  
-  server.close((err) => {
-    if (err) {
-      console.error('Error during server shutdown:', err);
+// For Vercel serverless functions, export the Express app
+// This allows Vercel to handle the server lifecycle
+module.exports = app;
+
+// For local development, you can still run the server
+if (require.main === module) {
+  const PORT = config.PORT || 5001;
+
+  // Graceful shutdown handling (only for local development)
+  const gracefulShutdown = (signal) => {
+    console.log(`\n${signal} received. Starting graceful shutdown...`);
+
+    server.close((err) => {
+      if (err) {
+        console.error('Error during server shutdown:', err);
+        process.exit(1);
+      }
+
+      console.log('HTTP server closed.');
+
+      // Close database connection
+      require('mongoose').connection.close(false, () => {
+        console.log('MongoDB connection closed.');
+        process.exit(0);
+      });
+    });
+
+    // Force close after 30 seconds
+    setTimeout(() => {
+      console.error('Could not close connections in time, forcefully shutting down');
       process.exit(1);
-    }
-    
-    console.log('HTTP server closed.');
-    
-    // Close database connection
-    require('mongoose').connection.close(false, () => {
-      console.log('MongoDB connection closed.');
-      process.exit(0);
+    }, 30000);
+  };
+
+  // Listen for termination signals
+  process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+  process.on('SIGINT', () => gracefulShutdown('SIGINT'));
+
+  // Handle uncaught exceptions
+  process.on('uncaughtException', (err) => {
+    console.error('Uncaught Exception:', err);
+    console.error('Shutting down the server due to uncaught exception');
+    process.exit(1);
+  });
+
+  // Handle unhandled promise rejections
+  process.on('unhandledRejection', (err, promise) => {
+    console.error('Unhandled Rejection at:', promise, 'reason:', err);
+    console.error('Shutting down the server due to unhandled promise rejection');
+    server.close(() => {
+      process.exit(1);
     });
   });
-  
-  // Force close after 30 seconds
-  setTimeout(() => {
-    console.error('Could not close connections in time, forcefully shutting down');
-    process.exit(1);
-  }, 30000);
-};
 
-// Listen for termination signals
-process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
-process.on('SIGINT', () => gracefulShutdown('SIGINT'));
-
-// Handle uncaught exceptions
-process.on('uncaughtException', (err) => {
-  console.error('Uncaught Exception:', err);
-  console.error('Shutting down the server due to uncaught exception');
-  process.exit(1);
-});
-
-// Handle unhandled promise rejections
-process.on('unhandledRejection', (err, promise) => {
-  console.error('Unhandled Rejection at:', promise, 'reason:', err);
-  console.error('Shutting down the server due to unhandled promise rejection');
-  server.close(() => {
-    process.exit(1);
-  });
-});
-
-// Start the server
-const PORT = config.PORT || 5001;
-
-const server = app.listen(PORT, () => {
-  console.log(`
+  const server = app.listen(PORT, () => {
+    console.log(`
 🚀 Junior Soccer Monitoring Tool API Server Started!
 
 Port: ${PORT}
@@ -187,7 +192,6 @@ API Endpoints:
 📊 Statistics:         /api/statistics/*
 
 Ready to manage players, matches, schedules, statistics, and authentication! ⚽📅📊🔐
-  `);
-});
-
-module.exports = { app, server };
+    `);
+  });
+}
