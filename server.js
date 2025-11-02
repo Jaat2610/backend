@@ -27,33 +27,13 @@ app.set('trust proxy', 1);
 // Basic security headers
 app.use(securityHeaders);
 
-// CORS middleware (allow frontend origins)
+// CORS middleware (allow all origins for simplicity)
 const corsOptions = {
-  origin: function (origin, callback) {
-    // Allow requests with no origin (like mobile apps or curl requests)
-    if (!origin) return callback(null, true);
-
-    const allowedOrigins = [
-      'http://localhost:3000',           // Local development
-      'http://localhost:3001',           // Alternative local port
-      'https://frontend-junior-soccer-monitor-tool.vercel.app', // Production frontend
-      'https://junior-soccer-monitor-tool.vercel.app' // Alternative frontend URL
-    ];
-
-    if (allowedOrigins.includes(origin)) {
-      return callback(null, true);
-    }
-
-    // In development, allow all origins for easier testing
-    if (process.env.NODE_ENV !== 'production') {
-      return callback(null, true);
-    }
-
-    return callback(new Error('Not allowed by CORS'));
-  },
+  origin: true, // Allow all origins
   credentials: true,
   optionsSuccessStatus: 200
 };
+
 app.use(cors(corsOptions));
 
 // Basic input sanitization
